@@ -5,145 +5,473 @@
     <title>Baby Name Popularity Chart</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
+        * { box-sizing: border-box; }
         body {
             font-family: Arial, sans-serif;
-            background: #1a1a2e;
+            background: #000000;
             color: white;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 40px;
         }
-        h1 { color: #e94560; }
+        h1 { color: #89CFF0; margin-bottom: 20px; }
+        .search-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         input {
             padding: 10px;
             font-size: 16px;
             border-radius: 8px;
             border: none;
-            margin-right: 10px;
             width: 200px;
         }
         button {
             padding: 10px 20px;
             font-size: 16px;
-            background: #e94560;
-            color: white;
+            background: #89CFF0;
+            color: black;
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            font-weight: bold;
         }
-        #chart-container {
-            width: 900px;
-            margin-top: 40px;
+        button:hover { background: #5bb8f5; }
+        .clear-btn { background: #333; color: white; }
+        .clear-btn:hover { background: #555; }
+        #spinner {
+            display: none;
+            margin-top: 20px;
+            font-size: 18px;
+            color: #89CFF0;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
         }
         #stats {
             margin-top: 20px;
-            background: #16213e;
+            background: #111;
             padding: 20px;
             border-radius: 10px;
-            width: 860px;
+            width: 900px;
+            display: none;
+            border: 1px solid #222;
+        }
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+        #stats p { margin: 8px 0; font-size: 15px; }
+        .female { color: #ff6eb4; }
+        .male { color: #89CFF0; }
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 6px;
+        }
+        .charts-wrapper {
+            display: flex;
+            gap: 40px;
+            margin-top: 40px;
+            width: 1200px;
+            justify-content: center;
+        }
+        .chart-box {
+            flex: 1;
+            background: #111;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #222;
+        }
+        .chart-box h2 { text-align: center; margin-bottom: 4px; }
+        .chart-box.female-box h2 { color: #ff6eb4; }
+        .chart-box.male-box h2 { color: #89CFF0; }
+        .life-exp-label {
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        #compare-section {
+            margin-top: 40px;
+            width: 1200px;
+            background: #111;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #222;
             display: none;
         }
-        #stats p { margin: 5px 0; }
+        #compare-section h2 {
+            color: #89CFF0;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        #top10-section {
+            margin-top: 40px;
+            width: 900px;
+            background: #111;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #222;
+            display: none;
+        }
+        #top10-section h2 {
+            color: #89CFF0;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+        .top10-bar-wrapper { margin-bottom: 10px; }
+        .top10-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 3px;
+        }
+        .top10-bar {
+            height: 22px;
+            border-radius: 4px;
+            transition: width 0.4s;
+        }
+        .female-bar { background: #ff6eb4; }
+        .male-bar { background: #89CFF0; }
     </style>
 </head>
 <body>
     <h1>Baby Name Popularity Explorer</h1>
-    <div>
-        <input type="text" id="nameInput" placeholder="Enter a name..." />
+
+    <div class="search-row">
+        <input type="text" id="nameInput" placeholder="Search a name..." />
+        <input type="text" id="compareName" placeholder="Compare with..." />
         <button onclick="fetchData()">Search</button>
+        <button class="clear-btn" onclick="clearAll()">Clear</button>
     </div>
+
+    <div id="spinner">⏳ Loading data...</div>
 
     <div id="stats">
-        <p><strong>First Year:</strong> <span id="first_year"></span></p>
-        <p><strong>Most Popular Year:</strong> <span id="most_popular_year"></span></p>
-        <p><strong>Estimated Age:</strong> <span id="estimated_age"></span></p>
-        <p><strong>Estimated Living Today:</strong> <span id="estimated_living"></span></p>
+        <div class="stat-grid">
+            <p><strong>First Year:</strong> <span id="first_year"></span></p>
+            <p><strong>Most Popular Year:</strong> <span id="most_popular_year"></span></p>
+            <p><strong>Estimated Age:</strong> <span id="estimated_age"></span></p>
+            <p><strong>Estimated Living Today:</strong> <span id="estimated_living"></span></p>
+            <p><strong>Trend:</strong> <span id="trend"></span></p>
+            <p><strong>Peak Decade:</strong> <span id="peak_decade"></span></p>
+            <p><strong>Rarity:</strong> <span id="rarity"></span></p>
+            <p class="female"><strong>♀ Life Expectancy:</strong> <span id="female_life_exp"></span> years</p>
+            <p class="male"><strong>♂ Life Expectancy:</strong> <span id="male_life_exp"></span> years</p>
+        </div>
     </div>
 
-    <div id="chart-container">
-        <canvas id="myChart"></canvas>
+    <div class="charts-wrapper" id="charts-wrapper" style="display:none;">
+        <div class="chart-box female-box">
+            <h2>♀ Female</h2>
+            <div class="life-exp-label female" id="female_life_label"></div>
+            <canvas id="femaleChart"></canvas>
+        </div>
+        <div class="chart-box male-box">
+            <h2>♂ Male</h2>
+            <div class="life-exp-label male" id="male_life_label"></div>
+            <canvas id="maleChart"></canvas>
+        </div>
+    </div>
+
+    <div id="compare-section">
+        <h2>📊 Name Comparison</h2>
+        <canvas id="compareChart"></canvas>
+    </div>
+
+    <div id="top10-section">
+        <h2 id="top10-title">Top 10 Names</h2>
+        <div id="top10-bars"></div>
     </div>
 
     <script>
-        let myChart = null;
+        let femaleChart = null;
+        let maleChart = null;
+        let compareChart = null;
+
+        const legendStyle = {
+            color: "white",
+            boxWidth: 30,
+            boxHeight: 4,
+            padding: 20,
+            font: { size: 13 }
+        };
+
+        document.getElementById("nameInput").addEventListener("keydown", e => {
+            if (e.key === "Enter") fetchData();
+        });
+        document.getElementById("compareName").addEventListener("keydown", e => {
+            if (e.key === "Enter") fetchData();
+        });
+
+        function clearAll() {
+            document.getElementById("nameInput").value = "";
+            document.getElementById("compareName").value = "";
+            document.getElementById("stats").style.display = "none";
+            document.getElementById("charts-wrapper").style.display = "none";
+            document.getElementById("compare-section").style.display = "none";
+            document.getElementById("top10-section").style.display = "none";
+            if (femaleChart) femaleChart.destroy();
+            if (maleChart) maleChart.destroy();
+            if (compareChart) compareChart.destroy();
+        }
 
         async function fetchData() {
-            const name = document.getElementById("nameInput").value;
+            const name = document.getElementById("nameInput").value.trim();
+            const compareName = document.getElementById("compareName").value.trim();
             if (!name) return;
 
-            const response = await fetch(`/nameinfo?name=${name}`);
-            if (!response.ok) {
-                alert("Name not found.");
-                return;
-            }
-            const data = await response.json();
+            document.getElementById("spinner").style.display = "block";
+            document.getElementById("stats").style.display = "none";
+            document.getElementById("charts-wrapper").style.display = "none";
+            document.getElementById("compare-section").style.display = "none";
+            document.getElementById("top10-section").style.display = "none";
 
-            const yearMap = {};
-            data.survivorship_by_year.forEach(item => {
-                if (!yearMap[item.year]) yearMap[item.year] = 0;
-                yearMap[item.year] += item.original_count;
-            });
+            try {
+                const response = await fetch(`/nameinfo?name=${name}`);
+                if (!response.ok) { alert("Name not found."); return; }
+                const data = await response.json();
 
-            const years = Object.keys(yearMap).sort();
-            const counts = years.map(y => yearMap[y]);
+                // All years
+                const allYearSet = new Set([
+                    ...Object.keys(data.female_by_year),
+                    ...Object.keys(data.male_by_year)
+                ]);
+                const allYears = Array.from(allYearSet).sort();
 
-            const livingMap = {};
-            data.survivorship_by_year.forEach(item => {
-                if (!livingMap[item.year]) livingMap[item.year] = 0;
-                livingMap[item.year] += item.estimated_living;
-            });
-            const livingCounts = years.map(y => livingMap[y]);
+                const femaleCounts = allYears.map(y => data.female_by_year[y] || 0);
+                const maleCounts = allYears.map(y => data.male_by_year[y] || 0);
 
-            document.getElementById("first_year").textContent = data.first_year;
-            document.getElementById("most_popular_year").textContent = data.most_popular_year;
-            document.getElementById("estimated_age").textContent = data.estimated_age;
-            document.getElementById("estimated_living").textContent = data.estimated_living.toLocaleString();
-            document.getElementById("stats").style.display = "block";
+                // Female survivorship by year
+                const femaleLivingMap = {};
+                data.female_survivorship.forEach(item => {
+                    const y = String(item.year);
+                    femaleLivingMap[y] = (femaleLivingMap[y] || 0) + item.estimated_living;
+                });
+                const femaleLivingCounts = allYears.map(y => femaleLivingMap[y] || 0);
 
-            if (myChart) myChart.destroy();
+                // Male survivorship by year
+                const maleLivingMap = {};
+                data.male_survivorship.forEach(item => {
+                    const y = String(item.year);
+                    maleLivingMap[y] = (maleLivingMap[y] || 0) + item.estimated_living;
+                });
+                const maleLivingCounts = allYears.map(y => maleLivingMap[y] || 0);
 
-            const ctx = document.getElementById("myChart").getContext("2d");
-            myChart = new Chart(ctx, {
-                type: "line",
-                data: {
-                    labels: years,
-                    datasets: [
-                        {
-                            label: `${name} - Total Born`,
-                            data: counts,
-                            borderColor: "#e94560",
-                            backgroundColor: "rgba(233,69,96,0.1)",
-                            fill: true,
-                            tension: 0.3
-                        },
-                        {
-                            label: `${name} - Estimated Living`,
-                            data: livingCounts,
-                            borderColor: "#53d8fb",
-                            backgroundColor: "rgba(83,216,251,0.1)",
-                            fill: true,
-                            tension: 0.3
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { labels: { color: "white" } },
-                        title: {
-                            display: true,
-                            text: `Popularity of "${name}" Over Time`,
-                            color: "white",
-                            font: { size: 18 }
-                        }
+                // Update stats
+                document.getElementById("first_year").textContent = data.first_year;
+                document.getElementById("most_popular_year").textContent = data.most_popular_year;
+                document.getElementById("estimated_age").textContent = data.estimated_age;
+                document.getElementById("estimated_living").textContent = data.estimated_living.toLocaleString();
+                document.getElementById("trend").textContent = data.trend;
+                document.getElementById("peak_decade").textContent = data.peak_decade;
+                document.getElementById("female_life_exp").textContent = data.female_life_expectancy;
+                document.getElementById("male_life_exp").textContent = data.male_life_expectancy;
+                const rarity = data.rarity;
+                document.getElementById("rarity").innerHTML =
+                    `<span class="badge" style="background:${rarity.color}; color:black;">${rarity.label}</span>`;
+                document.getElementById("female_life_label").textContent =
+                    `Life Expectancy (born ${data.most_popular_year}): ${data.female_life_expectancy} years`;
+                document.getElementById("male_life_label").textContent =
+                    `Life Expectancy (born ${data.most_popular_year}): ${data.male_life_expectancy} years`;
+
+                document.getElementById("stats").style.display = "block";
+                document.getElementById("charts-wrapper").style.display = "flex";
+
+                if (femaleChart) femaleChart.destroy();
+                if (maleChart) maleChart.destroy();
+
+                // Female chart
+                femaleChart = new Chart(
+                    document.getElementById("femaleChart").getContext("2d"), {
+                    type: "line",
+                    data: {
+                        labels: allYears,
+                        datasets: [
+                            {
+                                label: `${name} - Female Born`,
+                                data: femaleCounts,
+                                borderColor: "#ff6eb4",
+                                backgroundColor: "rgba(255,110,180,0.15)",
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: "Female Estimated Living",
+                                data: femaleLivingCounts,
+                                borderColor: "#90ee90",
+                                backgroundColor: "rgba(144,238,144,0.05)",
+                                fill: false,
+                                tension: 0.3,
+                                borderDash: [5, 5],
+                                pointRadius: 0
+                            }
+                        ]
                     },
-                    scales: {
-                        x: { ticks: { color: "white" } },
-                        y: { ticks: { color: "white" } }
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: legendStyle },
+                            title: {
+                                display: true,
+                                text: `"${name}" Female Popularity`,
+                                color: "white",
+                                font: { size: 14 }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: "white", maxTicksLimit: 10 } },
+                            y: { ticks: { color: "white" } }
+                        }
+                    }
+                });
+
+                // Male chart
+                maleChart = new Chart(
+                    document.getElementById("maleChart").getContext("2d"), {
+                    type: "line",
+                    data: {
+                        labels: allYears,
+                        datasets: [
+                            {
+                                label: `${name} - Male Born`,
+                                data: maleCounts,
+                                borderColor: "#89CFF0",
+                                backgroundColor: "rgba(137,207,240,0.15)",
+                                fill: true,
+                                tension: 0.3,
+                                pointRadius: 0
+                            },
+                            {
+                                label: "Male Estimated Living",
+                                data: maleLivingCounts,
+                                borderColor: "#90ee90",
+                                backgroundColor: "rgba(144,238,144,0.05)",
+                                fill: false,
+                                tension: 0.3,
+                                borderDash: [5, 5],
+                                pointRadius: 0
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: legendStyle },
+                            title: {
+                                display: true,
+                                text: `"${name}" Male Popularity`,
+                                color: "white",
+                                font: { size: 14 }
+                            }
+                        },
+                        scales: {
+                            x: { ticks: { color: "white", maxTicksLimit: 10 } },
+                            y: { ticks: { color: "white" } }
+                        }
+                    }
+                });
+
+                // Top 10 bar chart
+                const top10 = data.top10_that_year;
+                const maxCount = Math.max(...top10.map(n => n.count));
+                document.getElementById("top10-title").textContent =
+                    `Top 10 Names in ${data.most_popular_year}`;
+                const barsDiv = document.getElementById("top10-bars");
+                barsDiv.innerHTML = "";
+                top10.forEach(n => {
+                    const pct = (n.count / maxCount * 100).toFixed(1);
+                    const barClass = n.sex === "F" ? "female-bar" : "male-bar";
+                    barsDiv.innerHTML += `
+                        <div class="top10-bar-wrapper">
+                            <div class="top10-label">
+                                <span>${n.name} (${n.sex === "F" ? "♀" : "♂"})</span>
+                                <span>${n.count.toLocaleString()}</span>
+                            </div>
+                            <div class="top10-bar ${barClass}" style="width:${pct}%"></div>
+                        </div>`;
+                });
+                document.getElementById("top10-section").style.display = "block";
+
+                // Compare chart
+                if (compareName) {
+                    const resp2 = await fetch(`/nameinfo?name=${compareName}`);
+                    if (resp2.ok) {
+                        const data2 = await resp2.json();
+                        const allYears2Set = new Set([
+                            ...Object.keys(data.female_by_year),
+                            ...Object.keys(data.male_by_year),
+                            ...Object.keys(data2.female_by_year),
+                            ...Object.keys(data2.male_by_year)
+                        ]);
+                        const compareYears = Array.from(allYears2Set).sort();
+                        const total1 = compareYears.map(y =>
+                            (data.female_by_year[y] || 0) + (data.male_by_year[y] || 0));
+                        const total2 = compareYears.map(y =>
+                            (data2.female_by_year[y] || 0) + (data2.male_by_year[y] || 0));
+
+                        if (compareChart) compareChart.destroy();
+                        compareChart = new Chart(
+                            document.getElementById("compareChart").getContext("2d"), {
+                            type: "line",
+                            data: {
+                                labels: compareYears,
+                                datasets: [
+                                    {
+                                        label: name,
+                                        data: total1,
+                                        borderColor: "#ff6eb4",
+                                        backgroundColor: "rgba(255,110,180,0.1)",
+                                        fill: true,
+                                        tension: 0.3,
+                                        pointRadius: 0
+                                    },
+                                    {
+                                        label: compareName,
+                                        data: total2,
+                                        borderColor: "#89CFF0",
+                                        backgroundColor: "rgba(137,207,240,0.1)",
+                                        fill: true,
+                                        tension: 0.3,
+                                        pointRadius: 0
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                plugins: {
+                                    legend: { labels: legendStyle },
+                                    title: {
+                                        display: true,
+                                        text: `${name} vs ${compareName} — Total Popularity Over Time`,
+                                        color: "white",
+                                        font: { size: 15 }
+                                    }
+                                },
+                                scales: {
+                                    x: { ticks: { color: "white", maxTicksLimit: 15 } },
+                                    y: { ticks: { color: "white" } }
+                                }
+                            }
+                        });
+                        document.getElementById("compare-section").style.display = "block";
                     }
                 }
-            });
+
+            } finally {
+                document.getElementById("spinner").style.display = "none";
+            }
         }
     </script>
 </body>

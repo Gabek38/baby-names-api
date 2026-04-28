@@ -60,7 +60,9 @@ class DBManager:
     def search(self, name):
         with self.connect() as conn:
             cursor = conn.execute(
-                "SELECT name, sex, count, year FROM names WHERE name = ? COLLATE NOCASE",
+                """SELECT name, sex, SUM(count) as count, year 
+                   FROM names WHERE name = ? COLLATE NOCASE 
+                   GROUP BY name, sex, year""",
                 (name,)
             )
             rows = cursor.fetchall()
@@ -84,21 +86,38 @@ class DBManager:
             conn.commit()
         print("Record deleted.")
 
-    # ← NEW METHOD ADDED BELOW
     def get_survivorship(self, name):
         from database.life_tables import get_survival_probability
         rows = self.search(name)
         current_year = 2026
-        survival_data = []
+        female_survival = []
+        male_survival = []
         for row in rows:
             birth_year = row[3]
             count = row[2]
+            sex = row[1]
             age = current_year - birth_year
             survival_prob = get_survival_probability(age)
             estimated_living = round(count * survival_prob)
-            survival_data.append({
+            entry = {
                 "year": birth_year,
                 "original_count": count,
                 "estimated_living": estimated_living
-            })
-        return survival_data
+            }
+            if sex == "F":
+                female_survival.append(entry)
+            elif sex == "M":
+                male_survival.append(entry)
+        return {"female": female_survival, "male": male_survival}
+
+    def search_by_year(self, year):
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """SELECT name, sex, SUM(count) as count, year
+                   FROM names WHERE year = ?
+                   GROUP BY name, sex
+                   ORDER BY count DESC""",
+                (year,)
+            )
+            rows = cursor.fetchall()
+        return rows
