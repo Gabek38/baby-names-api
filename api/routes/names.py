@@ -69,27 +69,12 @@ def get_rarity(total_count):
     else:
         return {"label": "Extremely Rare", "color": "#ffd700"}
 
-@router.get("/nameinfo", summary="Get name statistics")
-def get_name_info(name: str):
-    results = db.search(name)
-    if not results:
-        raise HTTPException(status_code=404, detail=f"Name '{name}' not found in database.")
-
-    total_count = sum(row[2] for row in results)
+def build_name_response(name, results, survival_data, most_popular_year, total_count):
     weighted_year = sum(row[3] * row[2] for row in results) / total_count
     estimated_age = 2026 - round(weighted_year)
     first_year = min(row[3] for row in results)
-    most_popular = max(results, key=lambda r: r[2])
-    most_popular_year = most_popular[3]
     sorted_results = sorted(results, key=lambda r: r[2], reverse=True)
     top_years = [row[3] for row in sorted_results[:10]]
-
-    survival_data = db.get_survivorship(name)
-    total_estimated_living = (
-        sum(s["estimated_living"] for s in survival_data["female"]) +
-        sum(s["estimated_living"] for s in survival_data["male"])
-    )
-
     female_life_exp = estimate_life_expectancy("F", most_popular_year)
     male_life_exp = estimate_life_expectancy("M", most_popular_year)
 
@@ -104,19 +89,14 @@ def get_name_info(name: str):
         elif sex == "M":
             male_by_year[yr] = male_by_year.get(yr, 0) + cnt
 
-    trend = get_trend(results)
-    peak_decade = get_peak_decade(results)
-    rarity = get_rarity(total_count)
-
-    all_that_year = db.search_by_year(most_popular_year)
-    top10 = sorted(all_that_year, key=lambda r: r[2], reverse=True)[:10]
-    top10_names = [{"name": r[0], "count": r[2], "sex": r[1]} for r in top10]
+    total_estimated_living = (
+        sum(s["estimated_living"] for s in survival_data["female"]) +
+        sum(s["estimated_living"] for s in survival_data["male"])
+    )
 
     return {
-        "name": name,
         "estimated_age": estimated_age,
         "first_year": first_year,
-        "most_popular_year": most_popular_year,
         "top_years": top_years,
         "total_records": total_count,
         "estimated_living": total_estimated_living,
@@ -126,17 +106,54 @@ def get_name_info(name: str):
         "male_life_expectancy": male_life_exp,
         "female_by_year": female_by_year,
         "male_by_year": male_by_year,
-        "trend": trend,
-        "peak_decade": peak_decade,
-        "rarity": rarity,
-        "top10_that_year": top10_names
+        "trend": get_trend(results),
+        "peak_decade": get_peak_decade(results),
+        "rarity": get_rarity(total_count)
     }
+
+@router.get("/nameinfo")
+def get_name_info(name: str):
+    results = db.search(name)
+    if not results:
+        raise HTTPException(status_code=404, detail=f"Name '{name}' not found.")
+    total_count = sum(row[2] for row in results)
+    most_popular = max(results, key=lambda r: r[2])
+    most_popular_year = most_popular[3]
+    survival_data = db.get_survivorship(name)
+    all_that_year = db.search_by_year(most_popular_year)
+    top10 = sorted(all_that_year, key=lambda r: r[2], reverse=True)[:10]
+    top10_names = [{"name": r[0], "count": r[2], "sex": r[1]} for r in top10]
+    response = build_name_response(name, results, survival_data, most_popular_year, total_count)
+    response["name"] = name
+    response["most_popular_year"] = most_popular_year
+    response["top10_that_year"] = top10_names
+    return response
+
+@router.get("/nameinfo/state")
+def get_name_info_state(name: str, state: str):
+    results = db.search_state(name, state)
+    if not results:
+        raise HTTPException(status_code=404, detail=f"Name '{name}' not found in '{state}'.")
+    total_count = sum(row[2] for row in results)
+    most_popular = max(results, key=lambda r: r[2])
+    most_popular_year = most_popular[3]
+    survival_data = db.get_survivorship_state(name, state)
+    response = build_name_response(name, results, survival_data, most_popular_year, total_count)
+    response["name"] = name
+    response["state"] = state.upper()
+    response["most_popular_year"] = most_popular_year
+    return response
+
+@router.get("/states")
+def get_states():
+    states = db.get_all_states()
+    return {"states": states}
 
 @router.get("/topnames")
 def get_top_names(year: int):
     results = db.search_by_year(year)
     if not results:
-        raise HTTPException(status_code=404, detail=f"No data found for year {year}.")
+        raise HTTPException(status_code=404, detail=f"No data for year {year}.")
     top10 = sorted(results, key=lambda r: r[2], reverse=True)[:10]
     return {
         "year": year,

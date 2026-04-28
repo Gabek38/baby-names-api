@@ -23,12 +23,21 @@
             flex-wrap: wrap;
             justify-content: center;
         }
-        input {
+        input[type="text"] {
             padding: 10px;
             font-size: 16px;
             border-radius: 8px;
             border: none;
-            width: 200px;
+            width: 180px;
+        }
+        select {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            width: 80px;
+            background: white;
+            color: black;
         }
         button {
             padding: 10px 20px;
@@ -59,7 +68,7 @@
             background: #111;
             padding: 20px;
             border-radius: 10px;
-            width: 900px;
+            width: 960px;
             display: none;
             border: 1px solid #222;
         }
@@ -79,10 +88,16 @@
             font-size: 13px;
             margin-left: 6px;
         }
+        .section-title {
+            color: #89CFF0;
+            font-size: 20px;
+            margin: 40px 0 10px 0;
+            text-align: center;
+            width: 1200px;
+        }
         .charts-wrapper {
             display: flex;
-            gap: 40px;
-            margin-top: 40px;
+            gap: 30px;
             width: 1200px;
             justify-content: center;
         }
@@ -98,11 +113,10 @@
         .chart-box.male-box h2 { color: #89CFF0; }
         .life-exp-label {
             text-align: center;
-            font-size: 14px;
-            margin-bottom: 10px;
+            font-size: 13px;
+            margin-bottom: 8px;
         }
-        #compare-section {
-            margin-top: 40px;
+        .wide-box {
             width: 1200px;
             background: #111;
             border-radius: 12px;
@@ -110,21 +124,7 @@
             border: 1px solid #222;
             display: none;
         }
-        #compare-section h2 {
-            color: #89CFF0;
-            text-align: center;
-            margin-bottom: 16px;
-        }
-        #top10-section {
-            margin-top: 40px;
-            width: 900px;
-            background: #111;
-            border-radius: 12px;
-            padding: 20px;
-            border: 1px solid #222;
-            display: none;
-        }
-        #top10-section h2 {
+        .wide-box h2 {
             color: #89CFF0;
             text-align: center;
             margin-bottom: 16px;
@@ -143,6 +143,7 @@
         }
         .female-bar { background: #ff6eb4; }
         .male-bar { background: #89CFF0; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -150,6 +151,7 @@
 
     <div class="search-row">
         <input type="text" id="nameInput" placeholder="Search a name..." />
+        <select id="stateSelect"><option value="">National</option></select>
         <input type="text" id="compareName" placeholder="Compare with..." />
         <button onclick="fetchData()">Search</button>
         <button class="clear-btn" onclick="clearAll()">Clear</button>
@@ -171,7 +173,9 @@
         </div>
     </div>
 
-    <div class="charts-wrapper" id="charts-wrapper" style="display:none;">
+    <!-- National Charts -->
+    <div class="section-title hidden" id="national-title">🌎 National Data</div>
+    <div class="charts-wrapper hidden" id="national-charts">
         <div class="chart-box female-box">
             <h2>♀ Female</h2>
             <div class="life-exp-label female" id="female_life_label"></div>
@@ -184,12 +188,27 @@
         </div>
     </div>
 
-    <div id="compare-section">
+    <!-- State Charts -->
+    <div class="section-title hidden" id="state-title">📍 State Data</div>
+    <div class="charts-wrapper hidden" id="state-charts">
+        <div class="chart-box female-box">
+            <h2>♀ Female</h2>
+            <canvas id="stateFemaleChart"></canvas>
+        </div>
+        <div class="chart-box male-box">
+            <h2>♂ Male</h2>
+            <canvas id="stateMaleChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Compare Chart -->
+    <div class="wide-box" id="compare-section">
         <h2>📊 Name Comparison</h2>
         <canvas id="compareChart"></canvas>
     </div>
 
-    <div id="top10-section">
+    <!-- Top 10 -->
+    <div class="wide-box" id="top10-section">
         <h2 id="top10-title">Top 10 Names</h2>
         <div id="top10-bars"></div>
     </div>
@@ -197,6 +216,8 @@
     <script>
         let femaleChart = null;
         let maleChart = null;
+        let stateFemaleChart = null;
+        let stateMaleChart = null;
         let compareChart = null;
 
         const legendStyle = {
@@ -206,6 +227,20 @@
             padding: 20,
             font: { size: 13 }
         };
+
+        // Load states into dropdown
+        async function loadStates() {
+            const resp = await fetch("/states");
+            const data = await resp.json();
+            const select = document.getElementById("stateSelect");
+            data.states.forEach(s => {
+                const opt = document.createElement("option");
+                opt.value = s;
+                opt.textContent = s;
+                select.appendChild(opt);
+            });
+        }
+        loadStates();
 
         document.getElementById("nameInput").addEventListener("keydown", e => {
             if (e.key === "Enter") fetchData();
@@ -217,56 +252,104 @@
         function clearAll() {
             document.getElementById("nameInput").value = "";
             document.getElementById("compareName").value = "";
+            document.getElementById("stateSelect").value = "";
             document.getElementById("stats").style.display = "none";
-            document.getElementById("charts-wrapper").style.display = "none";
+            document.getElementById("national-title").classList.add("hidden");
+            document.getElementById("national-charts").classList.add("hidden");
+            document.getElementById("state-title").classList.add("hidden");
+            document.getElementById("state-charts").classList.add("hidden");
             document.getElementById("compare-section").style.display = "none";
             document.getElementById("top10-section").style.display = "none";
-            if (femaleChart) femaleChart.destroy();
-            if (maleChart) maleChart.destroy();
-            if (compareChart) compareChart.destroy();
+            [femaleChart, maleChart, stateFemaleChart, stateMaleChart, compareChart].forEach(c => { if (c) c.destroy(); });
+        }
+
+        function buildLineChart(canvasId, datasets, title, oldChart) {
+            if (oldChart) oldChart.destroy();
+            return new Chart(document.getElementById(canvasId).getContext("2d"), {
+                type: "line",
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    parsing: false,
+                    plugins: {
+                        legend: { labels: legendStyle },
+                        title: { display: true, text: title, color: "white", font: { size: 14 } }
+                    },
+                    scales: {
+                        x: { type: "category", ticks: { color: "white", maxTicksLimit: 10 } },
+                        y: { ticks: { color: "white" } }
+                    }
+                }
+            });
+        }
+
+        function makeDatasets(name, allYears, bornCounts, livingCounts, bornColor, bornBg, label) {
+            return [
+                {
+                    label: `${name} - ${label} Born`,
+                    data: allYears.map((y, i) => ({ x: y, y: bornCounts[i] })),
+                    borderColor: bornColor,
+                    backgroundColor: bornBg,
+                    fill: true, tension: 0.3, pointRadius: 0
+                },
+                {
+                    label: "Estimated Living",
+                    data: allYears.map((y, i) => ({ x: y, y: livingCounts[i] })),
+                    borderColor: "#90ee90",
+                    backgroundColor: "rgba(144,238,144,0.05)",
+                    fill: false, tension: 0.3,
+                    borderDash: [5, 5], pointRadius: 0
+                }
+            ];
+        }
+
+        function processData(data) {
+            const allYearSet = new Set([
+                ...Object.keys(data.female_by_year),
+                ...Object.keys(data.male_by_year)
+            ]);
+            const allYears = Array.from(allYearSet).sort();
+
+            const femaleCounts = allYears.map(y => data.female_by_year[y] || 0);
+            const maleCounts = allYears.map(y => data.male_by_year[y] || 0);
+
+            const femaleLivingMap = {};
+            data.female_survivorship.forEach(item => {
+                const y = String(item.year);
+                femaleLivingMap[y] = (femaleLivingMap[y] || 0) + item.estimated_living;
+            });
+            const femaleLivingCounts = allYears.map(y => femaleLivingMap[y] || 0);
+
+            const maleLivingMap = {};
+            data.male_survivorship.forEach(item => {
+                const y = String(item.year);
+                maleLivingMap[y] = (maleLivingMap[y] || 0) + item.estimated_living;
+            });
+            const maleLivingCounts = allYears.map(y => maleLivingMap[y] || 0);
+
+            return { allYears, femaleCounts, maleCounts, femaleLivingCounts, maleLivingCounts };
         }
 
         async function fetchData() {
             const name = document.getElementById("nameInput").value.trim();
             const compareName = document.getElementById("compareName").value.trim();
+            const state = document.getElementById("stateSelect").value;
             if (!name) return;
 
             document.getElementById("spinner").style.display = "block";
             document.getElementById("stats").style.display = "none";
-            document.getElementById("charts-wrapper").style.display = "none";
+            document.getElementById("national-title").classList.add("hidden");
+            document.getElementById("national-charts").classList.add("hidden");
+            document.getElementById("state-title").classList.add("hidden");
+            document.getElementById("state-charts").classList.add("hidden");
             document.getElementById("compare-section").style.display = "none";
             document.getElementById("top10-section").style.display = "none";
 
             try {
-                const response = await fetch(`/nameinfo?name=${name}`);
-                if (!response.ok) { alert("Name not found."); return; }
-                const data = await response.json();
-
-                // All years
-                const allYearSet = new Set([
-                    ...Object.keys(data.female_by_year),
-                    ...Object.keys(data.male_by_year)
-                ]);
-                const allYears = Array.from(allYearSet).sort();
-
-                const femaleCounts = allYears.map(y => data.female_by_year[y] || 0);
-                const maleCounts = allYears.map(y => data.male_by_year[y] || 0);
-
-                // Female survivorship by year
-                const femaleLivingMap = {};
-                data.female_survivorship.forEach(item => {
-                    const y = String(item.year);
-                    femaleLivingMap[y] = (femaleLivingMap[y] || 0) + item.estimated_living;
-                });
-                const femaleLivingCounts = allYears.map(y => femaleLivingMap[y] || 0);
-
-                // Male survivorship by year
-                const maleLivingMap = {};
-                data.male_survivorship.forEach(item => {
-                    const y = String(item.year);
-                    maleLivingMap[y] = (maleLivingMap[y] || 0) + item.estimated_living;
-                });
-                const maleLivingCounts = allYears.map(y => maleLivingMap[y] || 0);
+                // National data
+                const resp = await fetch(`/nameinfo?name=${name}`);
+                if (!resp.ok) { alert("Name not found."); return; }
+                const data = await resp.json();
 
                 // Update stats
                 document.getElementById("first_year").textContent = data.first_year;
@@ -277,117 +360,63 @@
                 document.getElementById("peak_decade").textContent = data.peak_decade;
                 document.getElementById("female_life_exp").textContent = data.female_life_expectancy;
                 document.getElementById("male_life_exp").textContent = data.male_life_expectancy;
-                const rarity = data.rarity;
                 document.getElementById("rarity").innerHTML =
-                    `<span class="badge" style="background:${rarity.color}; color:black;">${rarity.label}</span>`;
+                    `<span class="badge" style="background:${data.rarity.color}; color:black;">${data.rarity.label}</span>`;
                 document.getElementById("female_life_label").textContent =
                     `Life Expectancy (born ${data.most_popular_year}): ${data.female_life_expectancy} years`;
                 document.getElementById("male_life_label").textContent =
                     `Life Expectancy (born ${data.most_popular_year}): ${data.male_life_expectancy} years`;
-
                 document.getElementById("stats").style.display = "block";
-                document.getElementById("charts-wrapper").style.display = "flex";
 
-                if (femaleChart) femaleChart.destroy();
-                if (maleChart) maleChart.destroy();
+                // National charts
+                const { allYears, femaleCounts, maleCounts, femaleLivingCounts, maleLivingCounts } = processData(data);
 
-                // Female chart
-                femaleChart = new Chart(
-                    document.getElementById("femaleChart").getContext("2d"), {
-                    type: "line",
-                    data: {
-                        labels: allYears,
-                        datasets: [
-                            {
-                                label: `${name} - Female Born`,
-                                data: femaleCounts,
-                                borderColor: "#ff6eb4",
-                                backgroundColor: "rgba(255,110,180,0.15)",
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 0
-                            },
-                            {
-                                label: "Female Estimated Living",
-                                data: femaleLivingCounts,
-                                borderColor: "#90ee90",
-                                backgroundColor: "rgba(144,238,144,0.05)",
-                                fill: false,
-                                tension: 0.3,
-                                borderDash: [5, 5],
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { labels: legendStyle },
-                            title: {
-                                display: true,
-                                text: `"${name}" Female Popularity`,
-                                color: "white",
-                                font: { size: 14 }
-                            }
-                        },
-                        scales: {
-                            x: { ticks: { color: "white", maxTicksLimit: 10 } },
-                            y: { ticks: { color: "white" } }
-                        }
+                femaleChart = buildLineChart(
+                    "femaleChart",
+                    makeDatasets(name, allYears, femaleCounts, femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
+                    `"${name}" Female — National`,
+                    femaleChart
+                );
+                maleChart = buildLineChart(
+                    "maleChart",
+                    makeDatasets(name, allYears, maleCounts, maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
+                    `"${name}" Male — National`,
+                    maleChart
+                );
+
+                document.getElementById("national-title").classList.remove("hidden");
+                document.getElementById("national-charts").classList.remove("hidden");
+
+                // State charts
+                if (state) {
+                    const stateResp = await fetch(`/nameinfo/state?name=${name}&state=${state}`);
+                    if (stateResp.ok) {
+                        const stateData = await stateResp.json();
+                        const sp = processData(stateData);
+
+                        stateFemaleChart = buildLineChart(
+                            "stateFemaleChart",
+                            makeDatasets(name, sp.allYears, sp.femaleCounts, sp.femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
+                            `"${name}" Female — ${state}`,
+                            stateFemaleChart
+                        );
+                        stateMaleChart = buildLineChart(
+                            "stateMaleChart",
+                            makeDatasets(name, sp.allYears, sp.maleCounts, sp.maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
+                            `"${name}" Male — ${state}`,
+                            stateMaleChart
+                        );
+
+                        document.getElementById("state-title").textContent = `📍 State Data — ${state}`;
+                        document.getElementById("state-title").classList.remove("hidden");
+                        document.getElementById("state-charts").classList.remove("hidden");
                     }
-                });
+                }
 
-                // Male chart
-                maleChart = new Chart(
-                    document.getElementById("maleChart").getContext("2d"), {
-                    type: "line",
-                    data: {
-                        labels: allYears,
-                        datasets: [
-                            {
-                                label: `${name} - Male Born`,
-                                data: maleCounts,
-                                borderColor: "#89CFF0",
-                                backgroundColor: "rgba(137,207,240,0.15)",
-                                fill: true,
-                                tension: 0.3,
-                                pointRadius: 0
-                            },
-                            {
-                                label: "Male Estimated Living",
-                                data: maleLivingCounts,
-                                borderColor: "#90ee90",
-                                backgroundColor: "rgba(144,238,144,0.05)",
-                                fill: false,
-                                tension: 0.3,
-                                borderDash: [5, 5],
-                                pointRadius: 0
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { labels: legendStyle },
-                            title: {
-                                display: true,
-                                text: `"${name}" Male Popularity`,
-                                color: "white",
-                                font: { size: 14 }
-                            }
-                        },
-                        scales: {
-                            x: { ticks: { color: "white", maxTicksLimit: 10 } },
-                            y: { ticks: { color: "white" } }
-                        }
-                    }
-                });
-
-                // Top 10 bar chart
+                // Top 10
                 const top10 = data.top10_that_year;
                 const maxCount = Math.max(...top10.map(n => n.count));
-                document.getElementById("top10-title").textContent =
-                    `Top 10 Names in ${data.most_popular_year}`;
+                document.getElementById("top10-title").textContent = `Top 10 Names in ${data.most_popular_year}`;
                 const barsDiv = document.getElementById("top10-bars");
                 barsDiv.innerHTML = "";
                 top10.forEach(n => {
@@ -433,18 +462,14 @@
                                         data: total1,
                                         borderColor: "#ff6eb4",
                                         backgroundColor: "rgba(255,110,180,0.1)",
-                                        fill: true,
-                                        tension: 0.3,
-                                        pointRadius: 0
+                                        fill: true, tension: 0.3, pointRadius: 0
                                     },
                                     {
                                         label: compareName,
                                         data: total2,
                                         borderColor: "#89CFF0",
                                         backgroundColor: "rgba(137,207,240,0.1)",
-                                        fill: true,
-                                        tension: 0.3,
-                                        pointRadius: 0
+                                        fill: true, tension: 0.3, pointRadius: 0
                                     }
                                 ]
                             },
@@ -455,8 +480,7 @@
                                     title: {
                                         display: true,
                                         text: `${name} vs ${compareName} — Total Popularity Over Time`,
-                                        color: "white",
-                                        font: { size: 15 }
+                                        color: "white", font: { size: 15 }
                                     }
                                 },
                                 scales: {

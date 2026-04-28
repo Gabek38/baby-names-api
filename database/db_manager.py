@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from config import DB_PATH, DATA_DIR
+from config import DB_PATH, DATA_DIR, STATE_DIR
 from models.name_record import NameRecord
 
 class DBManager:
@@ -21,13 +21,23 @@ class DBManager:
                     year INTEGER NOT NULL
                 )
             """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS state_names (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    state TEXT NOT NULL,
+                    sex TEXT NOT NULL,
+                    year INTEGER NOT NULL,
+                    name TEXT NOT NULL,
+                    count INTEGER NOT NULL
+                )
+            """)
             conn.commit()
-        print("Database table ready.")
+        print("Database tables ready.")
 
     def load_from_csv(self):
         files = [f for f in os.listdir(DATA_DIR) if f.endswith(".txt")]
         if not files:
-            print("No data files found.")
+            print("No national data files found.")
             return
         with self.connect() as conn:
             total = 0
@@ -46,7 +56,30 @@ class DBManager:
                         )
                         total += 1
             conn.commit()
-        print(f"Loaded {total} records into the database.")
+        print(f"Loaded {total} national records into the database.")
+
+    def load_state_data(self):
+        files = [f for f in os.listdir(STATE_DIR) if f.endswith(".TXT")]
+        if not files:
+            print("No state data files found.")
+            return
+        with self.connect() as conn:
+            total = 0
+            for filename in files:
+                filepath = os.path.join(STATE_DIR, filename)
+                with open(filepath, "r") as f:
+                    for line in f:
+                        parts = line.strip().split(",")
+                        if len(parts) != 5:
+                            continue
+                        state, sex, year, name, count = parts
+                        conn.execute(
+                            "INSERT INTO state_names (state, sex, year, name, count) VALUES (?, ?, ?, ?, ?)",
+                            (state, sex, int(year), name, int(count))
+                        )
+                        total += 1
+            conn.commit()
+        print(f"Loaded {total} state records into the database.")
 
     def insert(self, record: NameRecord):
         with self.connect() as conn:
@@ -60,10 +93,22 @@ class DBManager:
     def search(self, name):
         with self.connect() as conn:
             cursor = conn.execute(
-                """SELECT name, sex, SUM(count) as count, year 
-                   FROM names WHERE name = ? COLLATE NOCASE 
+                """SELECT name, sex, SUM(count) as count, year
+                   FROM names WHERE name = ? COLLATE NOCASE
                    GROUP BY name, sex, year""",
                 (name,)
+            )
+            rows = cursor.fetchall()
+        return rows
+
+    def search_state(self, name, state):
+        with self.connect() as conn:
+            cursor = conn.execute(
+                """SELECT name, sex, SUM(count) as count, year
+                   FROM state_names
+                   WHERE name = ? COLLATE NOCASE AND state = ?
+                   GROUP BY name, sex, year""",
+                (name, state.upper())
             )
             rows = cursor.fetchall()
         return rows
@@ -110,6 +155,30 @@ class DBManager:
                 male_survival.append(entry)
         return {"female": female_survival, "male": male_survival}
 
+    def get_survivorship_state(self, name, state):
+        from database.life_tables import get_survival_probability
+        rows = self.search_state(name, state)
+        current_year = 2026
+        female_survival = []
+        male_survival = []
+        for row in rows:
+            birth_year = row[3]
+            count = row[2]
+            sex = row[1]
+            age = current_year - birth_year
+            survival_prob = get_survival_probability(age)
+            estimated_living = round(count * survival_prob)
+            entry = {
+                "year": birth_year,
+                "original_count": count,
+                "estimated_living": estimated_living
+            }
+            if sex == "F":
+                female_survival.append(entry)
+            elif sex == "M":
+                male_survival.append(entry)
+        return {"female": female_survival, "male": male_survival}
+
     def search_by_year(self, year):
         with self.connect() as conn:
             cursor = conn.execute(
@@ -121,3 +190,11 @@ class DBManager:
             )
             rows = cursor.fetchall()
         return rows
+
+    def get_all_states(self):
+        with self.connect() as conn:
+            cursor = conn.execute(
+                "SELECT DISTINCT state FROM state_names ORDER BY state"
+            )
+            rows = cursor.fetchall()
+        return [row[0] for row in rows]

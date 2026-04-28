@@ -2,6 +2,6 @@ import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-DATA_DIR = os.path.join(BASE_DIR, "data", "names")
+DATA_DIR  = os.path.join(BASE_DIR, "data", "names")
 STATE_DIR = os.path.join(BASE_DIR, "data", "states")
 DB_PATH   = os.path.join(BASE_DIR, "db", "baby_names.db")
