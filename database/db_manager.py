@@ -83,3 +83,22 @@ class DBManager:
             )
             conn.commit()
         print("Record deleted.")
+
+    # ← NEW METHOD ADDED BELOW
+    def get_survivorship(self, name):
+        from database.life_tables import get_survival_probability
+        rows = self.search(name)
+        current_year = 2026
+        survival_data = []
+        for row in rows:
+            birth_year = row[3]
+            count = row[2]
+            age = current_year - birth_year
+            survival_prob = get_survival_probability(age)
+            estimated_living = round(count * survival_prob)
+            survival_data.append({
+                "year": birth_year,
+                "original_count": count,
+                "estimated_living": estimated_living
+            })
+        return survival_data

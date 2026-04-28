@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Baby Name Popularity Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+        }
+        h1 { color: #e94560; }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 8px;
+            border: none;
+            margin-right: 10px;
+            width: 200px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #e94560;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #chart-container {
+            width: 900px;
+            margin-top: 40px;
+        }
+        #stats {
+            margin-top: 20px;
+            background: #16213e;
+            padding: 20px;
+            border-radius: 10px;
+            width: 860px;
+            display: none;
+        }
+        #stats p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>Baby Name Popularity Explorer</h1>
+    <div>
+        <input type="text" id="nameInput" placeholder="Enter a name..." />
+        <button onclick="fetchData()">Search</button>
+    </div>
+
+    <div id="stats">
+        <p><strong>First Year:</strong> <span id="first_year"></span></p>
+        <p><strong>Most Popular Year:</strong> <span id="most_popular_year"></span></p>
+        <p><strong>Estimated Age:</strong> <span id="estimated_age"></span></p>
+        <p><strong>Estimated Living Today:</strong> <span id="estimated_living"></span></p>
+    </div>
+
+    <div id="chart-container">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <script>
+        let myChart = null;
+
+        async function fetchData() {
+            const name = document.getElementById("nameInput").value;
+            if (!name) return;
+
+            const response = await fetch(`/nameinfo?name=${name}`);
+            if (!response.ok) {
+                alert("Name not found.");
+                return;
+            }
+            const data = await response.json();
+
+            const yearMap = {};
+            data.survivorship_by_year.forEach(item => {
+                if (!yearMap[item.year]) yearMap[item.year] = 0;
+                yearMap[item.year] += item.original_count;
+            });
+
+            const years = Object.keys(yearMap).sort();
+            const counts = years.map(y => yearMap[y]);
+
+            const livingMap = {};
+            data.survivorship_by_year.forEach(item => {
+                if (!livingMap[item.year]) livingMap[item.year] = 0;
+                livingMap[item.year] += item.estimated_living;
+            });
+            const livingCounts = years.map(y => livingMap[y]);
+
+            document.getElementById("first_year").textContent = data.first_year;
+            document.getElementById("most_popular_year").textContent = data.most_popular_year;
+            document.getElementById("estimated_age").textContent = data.estimated_age;
+            document.getElementById("estimated_living").textContent = data.estimated_living.toLocaleString();
+            document.getElementById("stats").style.display = "block";
+
+            if (myChart) myChart.destroy();
+
+            const ctx = document.getElementById("myChart").getContext("2d");
+            myChart = new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: years,
+                    datasets: [
+                        {
+                            label: `${name} - Total Born`,
+                            data: counts,
+                            borderColor: "#e94560",
+                            backgroundColor: "rgba(233,69,96,0.1)",
+                            fill: true,
+                            tension: 0.3
+                        },
+                        {
+                            label: `${name} - Estimated Living`,
+                            data: livingCounts,
+                            borderColor: "#53d8fb",
+                            backgroundColor: "rgba(83,216,251,0.1)",
+                            fill: true,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { labels: { color: "white" } },
+                        title: {
+                            display: true,
+                            text: `Popularity of "${name}" Over Time`,
+                            color: "white",
+                            font: { size: 18 }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: "white" } },
+                        y: { ticks: { color: "white" } }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
