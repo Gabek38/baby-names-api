@@ -7,6 +7,8 @@ a two-part application build with python, SQLite, and FastAPI that ingests the S
 
 ## How To Run
 
+https://web-production-eafd3.up.railway.app/
+
 ## Set up
 '''bash
 python -m venv venv
