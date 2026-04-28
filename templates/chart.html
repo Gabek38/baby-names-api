@@ -228,7 +228,6 @@
             font: { size: 13 }
         };
 
-        // Load states into dropdown
         async function loadStates() {
             const resp = await fetch("/states");
             const data = await resp.json();
@@ -260,45 +259,54 @@
             document.getElementById("state-charts").classList.add("hidden");
             document.getElementById("compare-section").style.display = "none";
             document.getElementById("top10-section").style.display = "none";
-            [femaleChart, maleChart, stateFemaleChart, stateMaleChart, compareChart].forEach(c => { if (c) c.destroy(); });
+            [femaleChart, maleChart, stateFemaleChart, stateMaleChart, compareChart]
+                .forEach(c => { if (c) c.destroy(); });
         }
 
-        function buildLineChart(canvasId, datasets, title, oldChart) {
+        function buildLineChart(canvasId, labels, datasets, title, oldChart) {
             if (oldChart) oldChart.destroy();
             return new Chart(document.getElementById(canvasId).getContext("2d"), {
                 type: "line",
-                data: { datasets },
+                data: { labels: labels, datasets: datasets },
                 options: {
                     responsive: true,
-                    parsing: false,
                     plugins: {
                         legend: { labels: legendStyle },
-                        title: { display: true, text: title, color: "white", font: { size: 14 } }
+                        title: {
+                            display: true,
+                            text: title,
+                            color: "white",
+                            font: { size: 14 }
+                        }
                     },
                     scales: {
-                        x: { type: "category", ticks: { color: "white", maxTicksLimit: 10 } },
+                        x: { ticks: { color: "white", maxTicksLimit: 10 } },
                         y: { ticks: { color: "white" } }
                     }
                 }
             });
         }
 
-        function makeDatasets(name, allYears, bornCounts, livingCounts, bornColor, bornBg, label) {
+        function makeDatasets(name, bornCounts, livingCounts, bornColor, bornBg, label) {
             return [
                 {
                     label: `${name} - ${label} Born`,
-                    data: allYears.map((y, i) => ({ x: y, y: bornCounts[i] })),
+                    data: bornCounts,
                     borderColor: bornColor,
                     backgroundColor: bornBg,
-                    fill: true, tension: 0.3, pointRadius: 0
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0
                 },
                 {
                     label: "Estimated Living",
-                    data: allYears.map((y, i) => ({ x: y, y: livingCounts[i] })),
+                    data: livingCounts,
                     borderColor: "#90ee90",
                     backgroundColor: "rgba(144,238,144,0.05)",
-                    fill: false, tension: 0.3,
-                    borderDash: [5, 5], pointRadius: 0
+                    fill: false,
+                    tension: 0.3,
+                    borderDash: [5, 5],
+                    pointRadius: 0
                 }
             ];
         }
@@ -346,12 +354,11 @@
             document.getElementById("top10-section").style.display = "none";
 
             try {
-                // National data
                 const resp = await fetch(`/nameinfo?name=${name}`);
                 if (!resp.ok) { alert("Name not found."); return; }
                 const data = await resp.json();
 
-                // Update stats
+                // Stats box
                 document.getElementById("first_year").textContent = data.first_year;
                 document.getElementById("most_popular_year").textContent = data.most_popular_year;
                 document.getElementById("estimated_age").textContent = data.estimated_age;
@@ -373,13 +380,16 @@
 
                 femaleChart = buildLineChart(
                     "femaleChart",
-                    makeDatasets(name, allYears, femaleCounts, femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
+                    allYears,
+                    makeDatasets(name, femaleCounts, femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
                     `"${name}" Female — National`,
                     femaleChart
                 );
+
                 maleChart = buildLineChart(
                     "maleChart",
-                    makeDatasets(name, allYears, maleCounts, maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
+                    allYears,
+                    makeDatasets(name, maleCounts, maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
                     `"${name}" Male — National`,
                     maleChart
                 );
@@ -396,13 +406,16 @@
 
                         stateFemaleChart = buildLineChart(
                             "stateFemaleChart",
-                            makeDatasets(name, sp.allYears, sp.femaleCounts, sp.femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
+                            sp.allYears,
+                            makeDatasets(name, sp.femaleCounts, sp.femaleLivingCounts, "#ff6eb4", "rgba(255,110,180,0.15)", "Female"),
                             `"${name}" Female — ${state}`,
                             stateFemaleChart
                         );
+
                         stateMaleChart = buildLineChart(
                             "stateMaleChart",
-                            makeDatasets(name, sp.allYears, sp.maleCounts, sp.maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
+                            sp.allYears,
+                            makeDatasets(name, sp.maleCounts, sp.maleLivingCounts, "#89CFF0", "rgba(137,207,240,0.15)", "Male"),
                             `"${name}" Male — ${state}`,
                             stateMaleChart
                         );
@@ -416,7 +429,8 @@
                 // Top 10
                 const top10 = data.top10_that_year;
                 const maxCount = Math.max(...top10.map(n => n.count));
-                document.getElementById("top10-title").textContent = `Top 10 Names in ${data.most_popular_year}`;
+                document.getElementById("top10-title").textContent =
+                    `Top 10 Names in ${data.most_popular_year}`;
                 const barsDiv = document.getElementById("top10-bars");
                 barsDiv.innerHTML = "";
                 top10.forEach(n => {
@@ -462,14 +476,18 @@
                                         data: total1,
                                         borderColor: "#ff6eb4",
                                         backgroundColor: "rgba(255,110,180,0.1)",
-                                        fill: true, tension: 0.3, pointRadius: 0
+                                        fill: true,
+                                        tension: 0.3,
+                                        pointRadius: 0
                                     },
                                     {
                                         label: compareName,
                                         data: total2,
                                         borderColor: "#89CFF0",
                                         backgroundColor: "rgba(137,207,240,0.1)",
-                                        fill: true, tension: 0.3, pointRadius: 0
+                                        fill: true,
+                                        tension: 0.3,
+                                        pointRadius: 0
                                     }
                                 ]
                             },
@@ -480,7 +498,8 @@
                                     title: {
                                         display: true,
                                         text: `${name} vs ${compareName} — Total Popularity Over Time`,
-                                        color: "white", font: { size: 15 }
+                                        color: "white",
+                                        font: { size: 15 }
                                     }
                                 },
                                 scales: {
