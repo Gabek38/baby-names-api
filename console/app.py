@@ -11,20 +11,25 @@ def main():
     db.create_table()
     while True:
         print("\n=== Baby Name Database ===")
-        print("1. Load SSA data")
-        print("2. Add a new name")
-        print("3. Search for a name")
-        print("4. Update a name record")
-        print("5. Delete a name record")
-        print("6. Exit")
+        print("1. Load SSA national data")
+        print("2. Load SSA state data")
+        print("3. Add a new name")
+        print("4. Search for a name")
+        print("5. Update a name record")
+        print("6. Delete a name record")
+        print("7. Exit")
 
         choice = input("\nEnter choice: ").strip()
 
         if choice == "1":
-            print("Loading data... this may take a minute.")
+            print("Loading national data... this may take a minute.")
             db.load_from_csv()
 
         elif choice == "2":
+            print("Loading state data... this may take a few minutes.")
+            db.load_state_data()
+
+        elif choice == "3":
             name = input("Name: ").strip()
             sex = input("Sex (M/F): ").strip().upper()
             count = input("Count: ").strip()
@@ -35,7 +40,7 @@ def main():
             record = NameRecord(name, sex, int(count), int(year))
             db.insert(record)
 
-        elif choice == "3":
+        elif choice == "4":
             name = input("Enter name to search: ").strip()
             results = db.search(name)
             if not results:
@@ -46,7 +51,7 @@ def main():
                 for row in results:
                     print(f"{row[0]:<15} {row[1]:<5} {row[2]:<10} {row[3]}")
 
-        elif choice == "4":
+        elif choice == "5":
             name = input("Name to update: ").strip()
             year = input("Year: ").strip()
             sex = input("Sex (M/F): ").strip().upper()
@@ -56,7 +61,7 @@ def main():
                 continue
             db.update(name, int(year), sex, int(new_count))
 
-        elif choice == "5":
+        elif choice == "6":
             name = input("Name to delete: ").strip()
             year = input("Year: ").strip()
             sex = input("Sex (M/F): ").strip().upper()
@@ -65,12 +70,12 @@ def main():
                 continue
             db.delete(name, int(year), sex)
 
-        elif choice == "6":
+        elif choice == "7":
             print("Goodbye!")
             break
 
         else:
-            print("Invalid choice. Please enter 1-6.")
+            print("Invalid choice. Please enter 1-7.")
 
 if __name__ == "__main__":
     main()
