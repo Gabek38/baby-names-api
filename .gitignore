@@ -1,4 +1,5 @@
 __pycache__/
+db/baby_names.db
 *.pyc
 *.pyo
 venv/
